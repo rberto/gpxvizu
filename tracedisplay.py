@@ -65,11 +65,20 @@ def opentododata2scatterdata(result):
         d["ele"].append(x["elevation"])
     return d
 
-def find_elev(la, lo, result):
-    print("finding elev for: ", la , lo)
-    for loc in result["results"]:
-        if loc["location"]["lat"] == lat and loc["location"]["lng"]:
-            return loc["elevation"]
+def opentopodata2surfacedata(result):
+    sorted_result = sorted(result["results"], key = lambda x: (x["location"]["lat"], x["location"]["lng"]))
+
+    x = sorted(set([x["location"]["lng"] for x in sorted_result]))
+    y = sorted(set([x["location"]["lat"] for x in sorted_result]))
+    z_list = [x["elevation"] for x in sorted_result]
+
+    z_matrix = []
+    for z in z_list:
+        if len(z_matrix) == 0 or len(z_matrix[-1]) == len(x):
+            z_matrix.append([])
+        z_matrix[-1].append(z)
+
+    return x,y,z_matrix
 
 def get_open_elevations(locations):
     payload = {"locations": []}
@@ -144,17 +153,9 @@ else:
     with open(filename + ".json", 'r') as convert_file:
         result = json.load(convert_file)
 
-sorted_result = sorted(result["results"], key = lambda x: (x["location"]["lat"], x["location"]["lng"]))
 
-x = set([x["location"]["lng"] for x in sorted_result])
-y = set([x["location"]["lat"] for x in sorted_result])
-z_list = [x["elevation"] for x in sorted_result]
+x,y,z = opentopodata2surfacedata(result)
 
-z_matrix = []
-for z in z_list:
-    if len(z_matrix) == 0 or len(z_matrix[-1]) == len(x):
-        z_matrix.append([])
-    z_matrix[-1].append(z)
 
 
 # elevs = []
@@ -166,7 +167,7 @@ for z in z_list:
 #         print(elev)
 #         elevs[-1].append(elev)
 
-data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
+# data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
 
 
 # data["lat"].extend(result["lat"])
@@ -183,13 +184,16 @@ import plotly.graph_objects as go
 
 #fig = go.Figure(data=go.Scatter3d(x=elx, y=ely, z=elz, mode='markers'))
 
-fig = go.Figure(data=[go.Surface(z=z_matrix)])
-#,alphahull=5, opacity=0.4, color='cyan')]) #, text=data["text"], mode='markers',  marker=dict(
-#         size=1,
-#         color=data["src"],                # set color to an array/list of desired values
-#         colorscale='Viridis',   # choose a colorscale
-#         opacity=0.8
-#     )))
+
+fig = go.Figure(data=[go.Surface(x = x, y = y, z = z, opacity = 0.75),
+go.Scatter3d(x = data["lon"], y = data["lat"], z = data["ele"]
+, text=data["text"], mode='markers',  marker=dict(
+        size=1,
+        color=data["src"],                # set color to an array/list of desired values
+        colorscale='Viridis',   # choose a colorscale
+        opacity=0.8
+    ))])
+
 fig.update_yaxes(scaleanchor='x')
 
 fig.write_html("/gpx/file.html")
