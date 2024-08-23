@@ -185,7 +185,7 @@ import plotly.graph_objects as go
 #fig = go.Figure(data=go.Scatter3d(x=elx, y=ely, z=elz, mode='markers'))
 
 
-fig = go.Figure(data=[go.Surface(x = x, y = y, z = z, opacity = 0.75),
+fig = go.Figure(data=[go.Surface(x = x, y = y, z = z, hidesurface = True, opacity = 0.75, contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
 go.Scatter3d(x = data["lon"], y = data["lat"], z = data["ele"]
 , text=data["text"], mode='markers',  marker=dict(
         size=1,
