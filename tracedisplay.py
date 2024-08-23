@@ -184,8 +184,10 @@ import plotly.graph_objects as go
 
 #fig = go.Figure(data=go.Scatter3d(x=elx, y=ely, z=elz, mode='markers'))
 
+# fig = go.Figure(data=[go.Scatter(x = data["lon"], y = data["lat"])], layout = go.Layout ( paper_bgcolor= 'rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'))
 
-fig = go.Figure(data=[go.Surface(x = x, y = y, z = z, hidesurface = True, opacity = 0.75, contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
+
+fig = go.Figure(data=[go.Surface(x = x, y = y, z = z, hidesurface = True, showscale = False, opacity = 0.75, contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
 go.Scatter3d(x = data["lon"], y = data["lat"], z = data["ele"]
 , text=data["text"], mode='markers',  marker=dict(
         size=1,
@@ -194,6 +196,14 @@ go.Scatter3d(x = data["lon"], y = data["lat"], z = data["ele"]
         opacity=0.8
     ))])
 
-fig.update_yaxes(scaleanchor='x')
+
+fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
+
+# fig.update_yaxes(scaleanchor='x')
+# fig.update_xaxes(visible=False)
+# fig.update_yaxes(visible=False)
+# fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
+# fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
+# fig.update_layout(showlegend=False)
 
 fig.write_html("/gpx/file.html")
