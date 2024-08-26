@@ -5,6 +5,10 @@ from time import sleep
 from pathlib import Path
 import json
 
+from flask import Flask, render_template, url_for
+
+
+
 
 '''
 https://en.wikipedia.org/wiki/Geographic_coordinate_system#Latitude_and_longitude
@@ -101,133 +105,146 @@ def get_open_elevations(locations):
         data["ele"].append(x["elevation"])
     return data
 
-filename = "/gpx/20240819.gpx"
+def plot(filename):
 
-tree = ET.parse(filename)
-root = tree.getroot()
+    tree = ET.parse(filename)
+    root = tree.getroot()
 
-trk = root.find('{http://www.topografix.com/GPX/1/0}trk')
-seg = trk.find('{http://www.topografix.com/GPX/1/0}trkseg')
+    trk = root.find('{http://www.topografix.com/GPX/1/0}trk')
+    seg = trk.find('{http://www.topografix.com/GPX/1/0}trkseg')
 
-data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
+    data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
 
-max_lon = None
-min_lon = None
-max_lat = None
-min_lat = None
+    max_lon = None
+    min_lon = None
+    max_lat = None
+    min_lat = None
 
-for child in seg:
-    lat = float(child.get('lat'))
-    lon = float(child.get('lon'))
+    for child in seg:
+        lat = float(child.get('lat'))
+        lon = float(child.get('lon'))
 
-    if not max_lat or lat > max_lat: max_lat = lat
-    if not min_lat or lat < min_lat: min_lat = lat
-    if not max_lon or lon > max_lon: max_lon = lon
-    if not min_lon or lon < min_lon: min_lon = lon
+        if not max_lat or lat > max_lat: max_lat = lat
+        if not min_lat or lat < min_lat: min_lat = lat
+        if not max_lon or lon > max_lon: max_lon = lon
+        if not min_lon or lon < min_lon: min_lon = lon
 
-    # data["lat"].append(lat2m(lat))
-    # data["lon"].append(lon2m(lon))
+        # data["lat"].append(lat2m(lat))
+        # data["lon"].append(lon2m(lon))
 
-    data["lat"].append(lat)
-    data["lon"].append(lon)
-    data["ele"].append(float(child.find('{http://www.topografix.com/GPX/1/0}ele').text))
-    data["text"].append(child.find('{http://www.topografix.com/GPX/1/0}time').text)
-    data["src"].append("red")
-    # print(child.attrib)
-
-
-xsize = max(data["lon"]) - min(data["lon"])
+        data["lat"].append(lat)
+        data["lon"].append(lon)
+        data["ele"].append(float(child.find('{http://www.topografix.com/GPX/1/0}ele').text))
+        data["text"].append(child.find('{http://www.topografix.com/GPX/1/0}time').text)
+        data["src"].append("red")
+        # print(child.attrib)
 
 
-ysize = max(data["lat"]) - min(data["lat"])
+    xsize = max(data["lon"]) - min(data["lon"])
 
 
-lon_center = xsize / 2
-lat_center = ysize / 2
+    ysize = max(data["lat"]) - min(data["lat"])
+
+
+    lon_center = xsize / 2
+    lat_center = ysize / 2
 
 
 
-# print("trace size", xsize, ysize)
+    # print("trace size", xsize, ysize)
 
-# print(min(data["lat"]) , max(data["lat"]) , min(data["lon"]) , max(data["lon"]) )
+    # print(min(data["lat"]) , max(data["lat"]) , min(data["lon"]) , max(data["lon"]) )
 
-# print(min(data["lat"]) - xsize / 2, max(data["lat"]) + xsize / 2, min(data["lon"]) - ysize / 2 , max(data["lon"]) + ysize / 2)
+    # print(min(data["lat"]) - xsize / 2, max(data["lat"]) + xsize / 2, min(data["lon"]) - ysize / 2 , max(data["lon"]) + ysize / 2)
 
-lats = []
-lons = []
-grid, lats, lons = get_lat_lon_grid(min(data["lat"]) - xsize / 2, max(data["lat"]) + xsize / 2, min(data["lon"]) - ysize / 2 , max(data["lon"]) + ysize / 2)
+    lats = []
+    lons = []
+    grid, lats, lons = get_lat_lon_grid(min(data["lat"]) - xsize / 2, max(data["lat"]) + xsize / 2, min(data["lon"]) - ysize / 2 , max(data["lon"]) + ysize / 2)
 
-if not Path(filename + ".json").exists():
+    if not Path(filename + ".json").exists():
 
-    result = get_mult_ele(grid, "mapzen")
-    with open(filename + ".json", 'w') as convert_file: 
-        convert_file.write(json.dumps(result))
+        result = get_mult_ele(grid, "mapzen")
+        with open(filename + ".json", 'w') as convert_file: 
+            convert_file.write(json.dumps(result))
 
-else:
-    with open(filename + ".json", 'r') as convert_file:
-        result = json.load(convert_file)
-
-
-lat, lon ,z = opentopodata2surfacedata(result)
-
-x = [-1 * (i - lon_center) * lon2m(lon_center) for i in lat]
-y = [-1 * (i - lat_center) * lat2m(lat_center) for i in lon]
+    else:
+        with open(filename + ".json", 'r') as convert_file:
+            result = json.load(convert_file)
 
 
-data["x"] = [-1 * (i - lon_center) * lon2m(lon_center) for i in data["lon"]]
-data["y"] = [-1 * (i - lat_center) * lat2m(lat_center) for i in data["lat"]]
+    lat, lon ,z = opentopodata2surfacedata(result)
 
-# elevs = []
-# for la in lats:
-#     for lo in lons:
-#         if len(elevs) == 0 or len(elevs[-1]) == len(lats):
-#             elevs.append([])
-#         elev = find_elev(la, lo, result)
-#         print(elev)
-#         elevs[-1].append(elev)
-
-# data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
+    x = [-1 * (i - lon_center) * lon2m(lon_center) for i in lat]
+    y = [-1 * (i - lat_center) * lat2m(lat_center) for i in lon]
 
 
-# data["lat"].extend(result["lat"])
-# data["lon"].extend(result["lon"])
-# data["ele"].extend(result["ele"])
-# data["src"].extend(["grey"] * len(result["lat"]))
+    data["x"] = [-1 * (i - lon_center) * lon2m(lon_center) for i in data["lon"]]
+    data["y"] = [-1 * (i - lat_center) * lat2m(lat_center) for i in data["lat"]]
 
-# elx = [x["longitude"] for x in el["results"]]
-# ely = [x["latitude"] for x in el["results"]]
-# elz = [x["elevation"] for x in el["results"]]
+    # elevs = []
+    # for la in lats:
+    #     for lo in lons:
+    #         if len(elevs) == 0 or len(elevs[-1]) == len(lats):
+    #             elevs.append([])
+    #         elev = find_elev(la, lo, result)
+    #         print(elev)
+    #         elevs[-1].append(elev)
 
-import plotly.graph_objects as go
-
-
-#fig = go.Figure(data=go.Scatter3d(x=elx, y=ely, z=elz, mode='markers'))
-
-# fig = go.Figure(data=[go.Scatter(x = data["lon"], y = data["lat"])], layout = go.Layout ( paper_bgcolor= 'rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'))
-
-fig = go.Figure(data=[go.Surface(x = x, y = y, z = z,
-                                hidesurface = True,
-                                showscale = False,
-                                opacity = 0.75,
-                                contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
-go.Scatter3d(x = data["x"], y = data["y"], z = data["ele"],
-            text=data["text"], mode='markers',  marker=dict(
-            size=1,
-            color=data["src"],                # set color to an array/list of desired values
-            colorscale='Viridis',   # choose a colorscale
-            opacity=0.8
-    ))
-])
+    # data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
 
 
-# fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
-fig.update_scenes(aspectmode="data")
-# fig.update_scenes(aspectratio=dict(x = 1, y = 1, z = 1))
+    # data["lat"].extend(result["lat"])
+    # data["lon"].extend(result["lon"])
+    # data["ele"].extend(result["ele"])
+    # data["src"].extend(["grey"] * len(result["lat"]))
 
-# fig.update_xaxes(visible=False)
-# fig.update_yaxes(visible=False)
-# fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-# fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-# fig.update_layout(showlegend=False)
+    # elx = [x["longitude"] for x in el["results"]]
+    # ely = [x["latitude"] for x in el["results"]]
+    # elz = [x["elevation"] for x in el["results"]]
 
-fig.write_html("/gpx/file.html")
+    import plotly.graph_objects as go
+
+
+    #fig = go.Figure(data=go.Scatter3d(x=elx, y=ely, z=elz, mode='markers'))
+
+    # fig = go.Figure(data=[go.Scatter(x = data["lon"], y = data["lat"])], layout = go.Layout ( paper_bgcolor= 'rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'))
+
+    fig = go.Figure(data=[go.Surface(x = x, y = y, z = z,
+                                    hidesurface = True,
+                                    showscale = False,
+                                    opacity = 0.75,
+                                    contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
+    go.Scatter3d(x = data["x"], y = data["y"], z = data["ele"],
+                text=data["text"], mode='markers',  marker=dict(
+                size=1,
+                color=data["src"],                # set color to an array/list of desired values
+                colorscale='Viridis',   # choose a colorscale
+                opacity=0.8
+        ))
+    ])
+
+
+    # fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
+    fig.update_scenes(aspectmode="data")
+    # fig.update_scenes(aspectratio=dict(x = 1, y = 1, z = 1))
+
+    # fig.update_xaxes(visible=False)
+    # fig.update_yaxes(visible=False)
+    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
+    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
+    # fig.update_layout(showlegend=False)
+
+
+
+    return fig.to_html(full_html= False, div_id = "plot")
+
+
+app = Flask(__name__)
+with app.test_request_context():
+    url_for('static', filename='styles.css')
+
+
+@app.route("/")
+def hello_world():
+    p = plot("/gpx/20240819.gpx")
+    return render_template("index.html", plot = p)

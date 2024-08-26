@@ -3,9 +3,14 @@ FROM python:3.9.19-slim-bullseye
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+
+VOLUME [ "/src" ]
 VOLUME [ "/gpx" ]
 
-ADD . .
+WORKDIR /src
 
-CMD [ "python", "-u", "./tracedisplay.py" ]
+EXPOSE 5000
+
+
+CMD [ "python", "-u", "-m", "flask", "--app", "tracedisplay", "run", "--host=0.0.0.0", "--debug"]
 
