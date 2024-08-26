@@ -1,15 +1,22 @@
 import xml.etree.ElementTree as ET
-from math import cos
+from math import cos, radians
 import requests
 from time import sleep
 from pathlib import Path
 import json
 
-def lat2m(latitude):
-    return 111132.92-559.82 * cos(2 * latitude) + 1.175 * cos(4*latitude) - 0.0023 * cos(6 * latitude)
 
+'''
+https://en.wikipedia.org/wiki/Geographic_coordinate_system#Latitude_and_longitude
+'''
+def lat2m(latitude):
+    return 111132.92 - 559.82 * cos(2 * radians(latitude)) + 1.175 * cos(4 * radians(latitude)) - 0.0023 * cos(6 * radians(latitude))
+
+'''
+https://en.wikipedia.org/wiki/Geographic_coordinate_system#Latitude_and_longitude
+'''
 def lon2m(longitude):
-    return 111412.84 * cos(longitude) - 93.5 * cos(3 * longitude) + 0.118 * cos(5 * longitude)
+    return 111412.84 * cos(radians(longitude)) - 93.5 * cos(3 * radians(longitude)) + 0.118 * cos(5 * radians(longitude))
 
 def get_mult_ele(locations, dataset):
     print(len(locations))
@@ -129,10 +136,17 @@ for child in seg:
     # print(child.attrib)
 
 
-xsize = max(data["lat"]) - min(data["lat"])
+xsize = max(data["lon"]) - min(data["lon"])
 
 
-ysize = max(data["lon"]) - min(data["lon"])
+ysize = max(data["lat"]) - min(data["lat"])
+
+
+lon_center = xsize / 2
+lat_center = ysize / 2
+
+
+
 # print("trace size", xsize, ysize)
 
 # print(min(data["lat"]) , max(data["lat"]) , min(data["lon"]) , max(data["lon"]) )
@@ -154,9 +168,14 @@ else:
         result = json.load(convert_file)
 
 
-x,y,z = opentopodata2surfacedata(result)
+lat, lon ,z = opentopodata2surfacedata(result)
+
+x = [-1 * (i - lon_center) * lon2m(lon_center) for i in lat]
+y = [-1 * (i - lat_center) * lat2m(lat_center) for i in lon]
 
 
+data["x"] = [-1 * (i - lon_center) * lon2m(lon_center) for i in data["lon"]]
+data["y"] = [-1 * (i - lat_center) * lat2m(lat_center) for i in data["lat"]]
 
 # elevs = []
 # for la in lats:
@@ -186,20 +205,25 @@ import plotly.graph_objects as go
 
 # fig = go.Figure(data=[go.Scatter(x = data["lon"], y = data["lat"])], layout = go.Layout ( paper_bgcolor= 'rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'))
 
+fig = go.Figure(data=[go.Surface(x = x, y = y, z = z,
+                                hidesurface = True,
+                                showscale = False,
+                                opacity = 0.75,
+                                contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
+go.Scatter3d(x = data["x"], y = data["y"], z = data["ele"],
+            text=data["text"], mode='markers',  marker=dict(
+            size=1,
+            color=data["src"],                # set color to an array/list of desired values
+            colorscale='Viridis',   # choose a colorscale
+            opacity=0.8
+    ))
+])
 
-fig = go.Figure(data=[go.Surface(x = x, y = y, z = z, hidesurface = True, showscale = False, opacity = 0.75, contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
-go.Scatter3d(x = data["lon"], y = data["lat"], z = data["ele"]
-, text=data["text"], mode='markers',  marker=dict(
-        size=1,
-        color=data["src"],                # set color to an array/list of desired values
-        colorscale='Viridis',   # choose a colorscale
-        opacity=0.8
-    ))])
 
+# fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
+fig.update_scenes(aspectmode="data")
+# fig.update_scenes(aspectratio=dict(x = 1, y = 1, z = 1))
 
-fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
-
-# fig.update_yaxes(scaleanchor='x')
 # fig.update_xaxes(visible=False)
 # fig.update_yaxes(visible=False)
 # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
