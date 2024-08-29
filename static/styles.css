@@ -59,17 +59,17 @@ article {
 }
 
 #maincol {
-    background-color: darkgoldenrod;
+    background-color: rgb(184, 134, 11);
     grid-column-start: 2;
     grid-column-end: 3;
     display: grid;
-    grid-template-columns: 20% auto;
+    grid-template-columns: 400px  auto;
 }
 
 .titre {
     color: red;
 }
 
-#plot {
-    
+#plot1 {
+	width : fit-content;
 }

@@ -11,8 +11,16 @@
     <article>
         
         <div id = maincol>
-            {{ plot|safe }}
-            <div>Description</div>
+            <div id = plot1>
+                {{ plot|safe }}
+            </div>
+            <div class = "description">
+                <div>Date : {{ date }}</div>
+                <div>Start time: {{ start_time }}</div>
+                <div>End time: {{ end_time }}</div>
+                <div>Duration: {{ duration }}</div>
+                <div>Location : </div>
+            </div>
         </div>
         
     </article>

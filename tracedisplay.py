@@ -4,6 +4,7 @@ import requests
 from time import sleep
 from pathlib import Path
 import json
+from datetime import datetime
 
 from flask import Flask, render_template, url_for
 
@@ -139,6 +140,8 @@ def plot(filename):
         data["src"].append("red")
         # print(child.attrib)
 
+    start_time = datetime.fromisoformat(seg[0].find('{http://www.topografix.com/GPX/1/0}time').text[:-1])
+    end_time = datetime.fromisoformat(seg[-1].find('{http://www.topografix.com/GPX/1/0}time').text[:-1])
 
     xsize = max(data["lon"]) - min(data["lon"])
 
@@ -224,8 +227,12 @@ def plot(filename):
     ])
 
 
-    # fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
+    fig.update_scenes(xaxis_visible=False, yaxis_visible=False,zaxis_visible=False )
     fig.update_scenes(aspectmode="data")
+    fig.update_scenes(bgcolor='rgba(184, 134, 11,1)')
+    fig.update_layout(margin = {"b": 0, 't':0, 'r':0, 'l':0})
+    fig.update_layout(width = 400)
+    fig.update_layout(height = 400)
     # fig.update_scenes(aspectratio=dict(x = 1, y = 1, z = 1))
 
     # fig.update_xaxes(visible=False)
@@ -236,7 +243,7 @@ def plot(filename):
 
 
 
-    return fig.to_html(full_html= False, div_id = "plot")
+    return fig.to_html(full_html= False, div_id = "plot"), start_time, end_time
 
 
 app = Flask(__name__)
@@ -246,5 +253,5 @@ with app.test_request_context():
 
 @app.route("/")
 def hello_world():
-    p = plot("/gpx/20240819.gpx")
-    return render_template("index.html", plot = p)
+    p, start_time, end_time = plot("/gpx/20240819.gpx")
+    return render_template("index.html", plot = p, start_time = start_time, end_time = end_time)
