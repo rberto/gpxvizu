@@ -5,6 +5,7 @@ from time import sleep
 from pathlib import Path
 import json
 from datetime import datetime
+import plotly.graph_objects as go
 
 from flask import Flask, render_template, url_for
 
@@ -40,9 +41,9 @@ def get_lat_lon_grid(lat_start, lat_stop, lon_start, lon_stop):
     lats = []
     lons = []
     res = 0.001
-    latsteps = (lat_stop - lat_start) / res 
+    latsteps = (lat_stop - lat_start) / res
     # print(latsteps)
-    lonsteps = (lon_stop - lon_start) / res 
+    lonsteps = (lon_stop - lon_start) / res
     # print(lonsteps)
     for idx in range(0, int(latsteps)):
         lat = lat_start + idx * res
@@ -54,7 +55,7 @@ def get_lat_lon_grid(lat_start, lat_stop, lon_start, lon_stop):
             # print (f"min = {lon_start}, max = {lon_stop}", lon, lon >= lon_start, lon < lon_stop)
             locations.append({"lat": lat, "lon": lon})
     return locations, lats, lons
-    
+
 
 def get_opentopo_ele(locations, dataset):
     loc_str = "|".join([str(x["lat"])+","+str(x['lon']) for x in locations])
@@ -65,7 +66,7 @@ def get_opentopo_ele(locations, dataset):
         "interpolation": "cubic",
     }
     r = requests.post(url, json=data)
-    
+
     d = {"lat": [], "lon": [], "ele": []}
     # print(r.json())
     return r.json()
@@ -106,8 +107,7 @@ def get_open_elevations(locations):
         data["ele"].append(x["elevation"])
     return data
 
-def plot(filename):
-
+def getdatafromgpx(filename):
     tree = ET.parse(filename)
     root = tree.getroot()
 
@@ -116,112 +116,68 @@ def plot(filename):
 
     data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
 
-    max_lon = None
-    min_lon = None
-    max_lat = None
-    min_lat = None
+    # max_lon = None
+    # min_lon = None
+    # max_lat = None
+    # min_lat = None
 
     for child in seg:
         lat = float(child.get('lat'))
         lon = float(child.get('lon'))
 
-        if not max_lat or lat > max_lat: max_lat = lat
-        if not min_lat or lat < min_lat: min_lat = lat
-        if not max_lon or lon > max_lon: max_lon = lon
-        if not min_lon or lon < min_lon: min_lon = lon
-
-        # data["lat"].append(lat2m(lat))
-        # data["lon"].append(lon2m(lon))
+        # if not max_lat or lat > max_lat: max_lat = lat
+        # if not min_lat or lat < min_lat: min_lat = lat
+        # if not max_lon or lon > max_lon: max_lon = lon
+        # if not min_lon or lon < min_lon: min_lon = lon
 
         data["lat"].append(lat)
         data["lon"].append(lon)
         data["ele"].append(float(child.find('{http://www.topografix.com/GPX/1/0}ele').text))
         data["text"].append(child.find('{http://www.topografix.com/GPX/1/0}time').text)
-        data["src"].append("red")
+        # data["src"].append("red")
         # print(child.attrib)
 
     start_time = datetime.fromisoformat(seg[0].find('{http://www.topografix.com/GPX/1/0}time').text[:-1])
     end_time = datetime.fromisoformat(seg[-1].find('{http://www.topografix.com/GPX/1/0}time').text[:-1])
 
-    xsize = max(data["lon"]) - min(data["lon"])
+    return data, start_time, end_time
 
 
-    ysize = max(data["lat"]) - min(data["lat"])
+def get_metadata(lat_range, lon_range):
 
+    lon_center = lon_range / 2
+    lat_center = lat_range / 2
 
-    lon_center = xsize / 2
-    lat_center = ysize / 2
+    # lats = []
+    # lons = []
+    grid, lats, lons = get_lat_lon_grid(min(data["lat"]) - lon_range / 2, max(data["lat"]) + lon_range / 2, min(data["lon"]) - lat_range / 2 , max(data["lon"]) + lat_range / 2)
 
+    result = get_mult_ele(grid, "mapzen")
 
+    return result, lat_center, lon_center
 
-    # print("trace size", xsize, ysize)
+def plot(gpxdata, metadata, lat_center, lon_center):
 
-    # print(min(data["lat"]) , max(data["lat"]) , min(data["lon"]) , max(data["lon"]) )
+    lat, lon, z = opentopodata2surfacedata(metadata)
 
-    # print(min(data["lat"]) - xsize / 2, max(data["lat"]) + xsize / 2, min(data["lon"]) - ysize / 2 , max(data["lon"]) + ysize / 2)
-
-    lats = []
-    lons = []
-    grid, lats, lons = get_lat_lon_grid(min(data["lat"]) - xsize / 2, max(data["lat"]) + xsize / 2, min(data["lon"]) - ysize / 2 , max(data["lon"]) + ysize / 2)
-
-    if not Path(filename + ".json").exists():
-
-        result = get_mult_ele(grid, "mapzen")
-        with open(filename + ".json", 'w') as convert_file: 
-            convert_file.write(json.dumps(result))
-
-    else:
-        with open(filename + ".json", 'r') as convert_file:
-            result = json.load(convert_file)
-
-
-    lat, lon ,z = opentopodata2surfacedata(result)
-
+    # Convertion from lat, lon in degrees to x,y in meters.
     x = [-1 * (i - lon_center) * lon2m(lon_center) for i in lat]
     y = [-1 * (i - lat_center) * lat2m(lat_center) for i in lon]
 
+    gpxdata["x"] = [-1 * (i - lon_center) * lon2m(lon_center) for i in gpxdata["lon"]]
+    gpxdata["y"] = [-1 * (i - lat_center) * lat2m(lat_center) for i in gpxdata["lat"]]
 
-    data["x"] = [-1 * (i - lon_center) * lon2m(lon_center) for i in data["lon"]]
-    data["y"] = [-1 * (i - lat_center) * lat2m(lat_center) for i in data["lat"]]
-
-    # elevs = []
-    # for la in lats:
-    #     for lo in lons:
-    #         if len(elevs) == 0 or len(elevs[-1]) == len(lats):
-    #             elevs.append([])
-    #         elev = find_elev(la, lo, result)
-    #         print(elev)
-    #         elevs[-1].append(elev)
-
-    # data = {"lat":[], "lon":[], "text":[], "ele": [], "src": []}
-
-
-    # data["lat"].extend(result["lat"])
-    # data["lon"].extend(result["lon"])
-    # data["ele"].extend(result["ele"])
-    # data["src"].extend(["grey"] * len(result["lat"]))
-
-    # elx = [x["longitude"] for x in el["results"]]
-    # ely = [x["latitude"] for x in el["results"]]
-    # elz = [x["elevation"] for x in el["results"]]
-
-    import plotly.graph_objects as go
-
-
-    #fig = go.Figure(data=go.Scatter3d(x=elx, y=ely, z=elz, mode='markers'))
-
-    # fig = go.Figure(data=[go.Scatter(x = data["lon"], y = data["lat"])], layout = go.Layout ( paper_bgcolor= 'rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'))
 
     fig = go.Figure(data=[go.Surface(x = x, y = y, z = z,
                                     hidesurface = True,
                                     showscale = False,
                                     opacity = 0.75,
                                     contours = {"z": {"show": True, "start": 100, "end": 1700, "size": 100}}),
-    go.Scatter3d(x = data["x"], y = data["y"], z = data["ele"],
-                text=data["text"], mode='markers',  marker=dict(
+    go.Scatter3d(x = gpxdata["x"], y = gpxdata["y"], z = gpxdata["ele"],
+                text=gpxdata["text"], mode='markers',  marker=dict(
                 size=1,
-                color=data["src"],                # set color to an array/list of desired values
-                colorscale='Viridis',   # choose a colorscale
+                color="red",
+                colorscale='Viridis',
                 opacity=0.8
         ))
     ])
@@ -243,7 +199,7 @@ def plot(filename):
 
 
 
-    return fig.to_html(full_html= False, div_id = "plot"), start_time, end_time
+    return fig.to_html(full_html= False, div_id = "plot")
 
 
 app = Flask(__name__)
@@ -253,5 +209,25 @@ with app.test_request_context():
 
 @app.route("/")
 def hello_world():
-    p, start_time, end_time = plot("/gpx/20240819.gpx")
-    return render_template("index.html", plot = p, start_time = start_time, end_time = end_time)
+
+    filename = "/gpx/20240819.gpx"
+    gpxdata, start_time, end_time = getdatafromgpx(filename)
+
+    lon_range = max(gpxdata["lon"]) - min(gpxdata["lon"])
+    lat_range = max(gpxdata["lat"]) - min(gpxdata["lat"])
+
+
+
+    if not Path(filename + ".json").exists():
+        metadata = get_metadata(lat_range, lon_range)
+
+
+        with open(filename + ".json", 'w') as convert_file:
+            convert_file.write(json.dumps(result))
+    else:
+        with open(filename + ".json", 'r') as convert_file:
+            metadata = json.load(convert_file)
+
+    p = plot(gpxdata, metadata, lat_range / 2 , lon_range / 2)
+    p1 = plot(gpxdata, metadata, lat_range / 2 , lon_range / 2)
+    return render_template("index.html", plot = p, plot1 = p1, start_time = start_time, end_time = end_time, start_time1 = start_time, end_time1 = end_time)

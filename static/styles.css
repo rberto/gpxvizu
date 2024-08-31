@@ -73,3 +73,14 @@ article {
 #plot1 {
 	width : fit-content;
 }
+
+.description {
+
+	display: grid;
+    /* grid-template-columns: 400px  auto; */
+
+}
+
+.decriptiontext {
+	font-size: 150%;
+}
