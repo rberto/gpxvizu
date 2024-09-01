@@ -11,26 +11,18 @@
     <article>
         
         <div id = maincol>
-            <div id = plot1>
-                {{ plot|safe }}
+            {% for item in plots %}
+            <div class = "plot1">
+                {{ item.plot|safe }}
             </div>
             <div class = "description">
-                <div class = "decriptiontext" >Date : {{ date }}</div>
-                <div class = "decriptiontext" >Start time: {{ start_time }}</div>
-                <div class = "decriptiontext" >End time: {{ end_time }}</div>
-                <div class = "decriptiontext" >Duration: {{ duration }}</div>
+                <div class = "decriptiontext" >Filename : {{ item.name }}</div>
+                <div class = "decriptiontext" >Start time: {{ item.start_time }}</div>
+                <div class = "decriptiontext" >End time: {{ item.end_time }}</div>
+                <div class = "decriptiontext" >Duration: {{ item.duration }}</div>
                 <div class = "decriptiontext" >Location : </div>
             </div>
-            <div id = plot1>
-                {{ plot1|safe }}
-            </div>
-            <div class = "description">
-                <div class = "decriptiontext" >Date : {{ date }}</div>
-                <div class = "decriptiontext" >Start time: {{ start_time1 }}</div>
-                <div class = "decriptiontext" >End time: {{ end_time1 }}</div>
-                <div class = "decriptiontext" >Duration: {{ duration }}</div>
-                <div class = "decriptiontext" >Location : </div>
-            </div>
+            {% endfor %}
         </div>
         
     </article>

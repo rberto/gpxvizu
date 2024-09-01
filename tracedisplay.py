@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from math import cos, radians
+from math import cos, radians, sqrt
 import requests
 from time import sleep
 from pathlib import Path
@@ -9,6 +9,11 @@ import plotly.graph_objects as go
 
 from flask import Flask, render_template, url_for
 
+app = Flask(__name__)
+with app.test_request_context():
+    url_for('static', filename='styles.css')
+
+app.logger.info("dsfdsfsfsd")
 
 
 
@@ -25,15 +30,53 @@ def lon2m(longitude):
     return 111412.84 * cos(radians(longitude)) - 93.5 * cos(3 * radians(longitude)) + 0.118 * cos(5 * radians(longitude))
 
 def get_mult_ele(locations, dataset):
+    global app
     print(len(locations))
     data = {"results": []}
     n = 100
+    nbdownloaded =  0
     for sublocs in [locations[i:i+n] for i in range(0, len(locations), n)]:
         sleep(1)
-        print(len(sublocs))
         result = get_opentopo_ele(sublocs, dataset)
+        nbdownloaded += len(sublocs)
+        app.logger.debug(f"{nbdownloaded}/{len(locations)}")
+
         data["results"].extend(result["results"])
     return data
+
+
+def get_lat_lon_grid_fixednbpt(lat_start, lat_stop, lon_start, lon_stop):
+    # print(lat_start, lat_stop)
+    maxpoints = 1000
+    locations = []
+    lats = []
+    lons = []
+
+    # res = 0.001
+    # latsteps = (lat_stop - lat_start) / res
+    # # print(latsteps)
+    # lonsteps = (lon_stop - lon_start) / res
+    
+    # latspets * lonspets = maxpoints
+    # latsteps = (lat_stop - lat_start) / res
+    # lonsteps = (lon_stop - lon_start) / res
+    # (lat_stop - lat_start) / res * (lon_stop - lon_start) / res = maxpoints
+    res = sqrt((lat_stop - lat_start) * (lon_stop - lon_start) / maxpoints)
+
+    latsteps = (lat_stop - lat_start) / res
+    lonsteps = (lon_stop - lon_start) / res
+
+    # print(lonsteps)
+    for idx in range(0, int(latsteps)):
+        lat = lat_start + idx * res
+        lats.append(lat)
+        # print (f"min = {lat_start}, max = {lat_stop}", lat, str(lat >= lat_start), str(lat < lat_stop))
+        for jdx in range(0, int(lonsteps)):
+            lon = lon_start + jdx * res
+            lons.append(lon)
+            # print (f"min = {lon_start}, max = {lon_stop}", lon, lon >= lon_start, lon < lon_stop)
+            locations.append({"lat": lat, "lon": lon})
+    return locations, lats, lons
 
 def get_lat_lon_grid(lat_start, lat_stop, lon_start, lon_stop):
     # print(lat_start, lat_stop)
@@ -143,21 +186,21 @@ def getdatafromgpx(filename):
     return data, start_time, end_time
 
 
-def get_metadata(lat_range, lon_range):
+def get_metadata(min_lat, max_lat, min_lon, max_lon, lat_range, lon_range):
 
     lon_center = lon_range / 2
     lat_center = lat_range / 2
 
     # lats = []
     # lons = []
-    grid, lats, lons = get_lat_lon_grid(min(data["lat"]) - lon_range / 2, max(data["lat"]) + lon_range / 2, min(data["lon"]) - lat_range / 2 , max(data["lon"]) + lat_range / 2)
+    grid, lats, lons = get_lat_lon_grid_fixednbpt(min_lat - lon_range / 2, max_lat + lon_range / 2, min_lon - lat_range / 2 , max_lon + lat_range / 2)
 
     result = get_mult_ele(grid, "mapzen")
 
-    return result, lat_center, lon_center
+    return result
 
 def plot(gpxdata, metadata, lat_center, lon_center):
-
+    # app.logger.info(metadata)
     lat, lon, z = opentopodata2surfacedata(metadata)
 
     # Convertion from lat, lon in degrees to x,y in meters.
@@ -199,35 +242,38 @@ def plot(gpxdata, metadata, lat_center, lon_center):
 
 
 
-    return fig.to_html(full_html= False, div_id = "plot")
+    return fig.to_html(full_html= False)
 
 
-app = Flask(__name__)
-with app.test_request_context():
-    url_for('static', filename='styles.css')
+
 
 
 @app.route("/")
 def hello_world():
 
-    filename = "/gpx/20240819.gpx"
-    gpxdata, start_time, end_time = getdatafromgpx(filename)
+    plots = []
+    global app
 
-    lon_range = max(gpxdata["lon"]) - min(gpxdata["lon"])
-    lat_range = max(gpxdata["lat"]) - min(gpxdata["lat"])
+    for path in sorted(Path('/gpx').glob('*.gpx')):
+        app.logger.info(path)
+        filename = str(path)
+        gpxdata, start_time, end_time = getdatafromgpx(filename)
 
+        lon_range = max(gpxdata["lon"]) - min(gpxdata["lon"])
+        lat_range = max(gpxdata["lat"]) - min(gpxdata["lat"])
 
+        if not Path(filename + ".json").exists():
+            metadata = get_metadata(min(gpxdata["lat"]), max(gpxdata["lat"]), min(gpxdata["lon"]), max(gpxdata["lon"]), lat_range, lon_range)
+            with open(filename + ".json", 'w') as convert_file:
+                app.logger.info(f'writting metadata to {filename + ".json"}')
+                convert_file.write(json.dumps(metadata))
+        else:
+            with open(filename + ".json", 'r') as convert_file:
+                metadata = json.load(convert_file)
 
-    if not Path(filename + ".json").exists():
-        metadata = get_metadata(lat_range, lon_range)
+        p = plot(gpxdata, metadata, lat_range / 2 , lon_range / 2)
+        p1 = plot(gpxdata, metadata, lat_range / 2 , lon_range / 2)
 
+        plots.append({"plot": p, "start_time": start_time, "end_time": end_time, "name": path.name})
 
-        with open(filename + ".json", 'w') as convert_file:
-            convert_file.write(json.dumps(result))
-    else:
-        with open(filename + ".json", 'r') as convert_file:
-            metadata = json.load(convert_file)
-
-    p = plot(gpxdata, metadata, lat_range / 2 , lon_range / 2)
-    p1 = plot(gpxdata, metadata, lat_range / 2 , lon_range / 2)
-    return render_template("index.html", plot = p, plot1 = p1, start_time = start_time, end_time = end_time, start_time1 = start_time, end_time1 = end_time)
+    return render_template("index.html", plots = plots)
